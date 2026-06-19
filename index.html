@@ -1,0 +1,1352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Joel 2 Army — Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+
+<!-- Firebase SDKs -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
+         signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, doc, getDoc, getDocs, setDoc,
+         updateDoc, onSnapshot, serverTimestamp, query, orderBy }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+/* ╔══════════════════════════════════════════════════════╗
+   ║  🔥 PASTE YOUR FIREBASE CONFIG HERE                 ║
+   ║  Get it from: Firebase Console → Project Settings   ║
+   ║  → Your apps → Web app → Config                     ║
+   ╚══════════════════════════════════════════════════════╝ */
+const firebaseConfig = {
+    apiKey: "AIzaSyB8vYzhYUP_qJyZaTSMZKkwGGaKMQkIdLA",
+    authDomain: "joel-two-army.firebaseapp.com",
+    projectId: "joel-two-army",
+    storageBucket: "joel-two-army.firebasestorage.app",
+    messagingSenderId: "1008298038511",
+    appId: "1:1008298038511:web:034127bd46bb030ad6771a"
+  };
+
+const CONFIGURED = !firebaseConfig.apiKey.startsWith("PASTE");
+
+let app, auth, db;
+if (CONFIGURED) {
+  app  = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db   = getFirestore(app);
+}
+
+// Expose globals for non-module functions
+window._fb = { auth, db, CONFIGURED,
+  signInWithEmailAndPassword, createUserWithEmailAndPassword,
+  signOut, onAuthStateChanged,
+  collection, doc, getDoc, getDocs, setDoc, updateDoc,
+  onSnapshot, serverTimestamp, query, orderBy };
+
+window.dispatchEvent(new Event('fbReady'));
+</script>
+
+<style>
+:root{
+  --gold:#F5A623;--gold-lt:#FFF8E8;--gold-dk:#C17D0A;
+  --navy:#1A2B5A;--navy-mid:#2D4A8A;--sky:#4A90D9;--sky-lt:#EAF4FF;
+  --green:#27AE60;--green-lt:#E8F8EF;--red:#E74C3C;--red-lt:#FDEAEA;
+  --purple:#8E44AD;--teal:#16A085;--teal-lt:#E0F5F1;--orange:#E67E22;
+  --bg:#F0F4FF;--white:#fff;--text:#1A2B5A;--muted:#6B7A99;--border:#D8E2F5;
+  --r:14px;--sh:0 2px 12px rgba(26,43,90,.10);--bottom-nav:64px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden}
+body{font-family:"Nunito",sans-serif;background:var(--bg);color:var(--text);
+     display:flex;flex-direction:column;max-width:480px;margin:0 auto;position:relative}
+
+/* ── SETUP SCREEN ── */
+#setupScreen{position:fixed;inset:0;background:var(--bg);z-index:99999;
+  max-width:480px;margin:0 auto;overflow-y:auto;padding:20px 18px 40px;}
+#setupScreen.hidden{display:none}
+.su-logo{text-align:center;padding:20px 0 16px;}
+.su-logo-title{font-family:"Fredoka One",cursive;font-size:24px;color:var(--navy);}
+.su-logo-sub{font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+.su-step{background:var(--white);border-radius:var(--r);box-shadow:var(--sh);
+  padding:16px;margin-bottom:14px;}
+.su-step-num{display:inline-flex;align-items:center;justify-content:center;
+  width:28px;height:28px;border-radius:50%;background:var(--navy);
+  color:#fff;font-family:"Fredoka One",cursive;font-size:14px;margin-right:8px;flex-shrink:0;}
+.su-step-title{font-family:"Fredoka One",cursive;font-size:16px;color:var(--navy);
+  display:flex;align-items:center;margin-bottom:10px;}
+.su-code{background:var(--bg);border-radius:8px;padding:10px 12px;
+  font-family:monospace;font-size:12px;color:var(--navy);word-break:break-all;
+  margin:8px 0;border:1px solid var(--border);}
+.su-note{font-size:12px;color:var(--muted);font-weight:700;margin-top:6px;line-height:1.7;}
+.su-input-group{margin-bottom:10px;}
+.su-label{font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.4px;display:block;margin-bottom:4px;}
+.su-input{border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;
+  font-family:"Nunito",sans-serif;font-size:13px;font-weight:600;color:var(--text);
+  background:var(--bg);outline:none;width:100%;}
+.su-input:focus{border-color:var(--sky);}
+
+/* ── SHARED ── */
+.hdr{background:linear-gradient(135deg,var(--navy),var(--navy-mid));padding:12px 16px 10px;
+  display:flex;align-items:center;gap:10px;flex-shrink:0;position:relative;z-index:10;
+  box-shadow:0 2px 10px rgba(0,0,0,.3)}
+.hdr-name{font-family:"Fredoka One",cursive;font-size:17px;color:#fff;line-height:1.1;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hdr-sub{font-size:10px;color:rgba(255,255,255,.65);font-weight:600;margin-top:1px}
+.hdr-week{background:var(--gold);color:var(--navy);border-radius:20px;padding:4px 10px;
+  font-size:11px;font-weight:800;flex-shrink:0;border:none;cursor:pointer;
+  font-family:"Nunito",sans-serif}
+.scroll{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
+  padding:14px 14px calc(var(--bottom-nav)+14px)}
+.bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);
+  width:100%;max-width:480px;background:var(--white);border-top:1px solid var(--border);
+  display:flex;z-index:20;box-shadow:0 -2px 16px rgba(26,43,90,.12)}
+.bn-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:8px 2px 10px;border:none;background:none;cursor:pointer;color:var(--muted);
+  font-family:"Nunito",sans-serif;font-size:9px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.3px;transition:color .2s;min-height:var(--bottom-nav);gap:3px}
+.bn-btn .ico{font-size:20px;line-height:1}
+.bn-btn.active{color:var(--navy)}
+.bn-btn .active-dot{width:4px;height:4px;border-radius:50%;background:var(--gold);
+  margin-top:1px;display:none}
+.bn-btn.active .active-dot{display:block}
+.view{display:none;animation:fadeIn .2s ease}
+.view.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.card{background:var(--white);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;margin-bottom:12px}
+.card-p{padding:14px}
+.stitle{font-family:"Fredoka One",cursive;font-size:16px;color:var(--navy);
+  margin-bottom:10px;display:flex;align-items:center;gap:7px}
+.stitle .dot{width:8px;height:8px;border-radius:50%;background:var(--gold);flex-shrink:0}
+.ov-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.ov-card{background:var(--white);border-radius:var(--r);padding:14px 12px;
+  box-shadow:var(--sh);border-top:3px solid transparent;text-align:center}
+.ov-icon{font-size:22px;margin-bottom:4px;display:block}
+.ov-val{font-family:"Fredoka One",cursive;font-size:24px;line-height:1}
+.ov-lbl{font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.3px;margin-top:2px}
+.pil-list{display:flex;flex-direction:column;gap:10px;margin-bottom:14px}
+.pil-item{background:var(--white);border-radius:var(--r);box-shadow:var(--sh);padding:12px 14px}
+.pil-top{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.pil-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;
+  justify-content:center;font-size:18px;flex-shrink:0}
+.pil-name{font-family:"Fredoka One",cursive;font-size:14px;color:var(--navy);flex:1}
+.pil-pct{font-size:16px;font-weight:900}
+.pb{background:var(--bg);border-radius:100px;height:7px;overflow:hidden;margin-bottom:8px}
+.pb-fill{height:100%;border-radius:100px;transition:width .5s cubic-bezier(.4,2,.6,1)}
+.day-row{display:flex;gap:4px}
+.dd{width:26px;height:26px;border-radius:50%;border:2px solid var(--border);
+  background:var(--bg);display:flex;align-items:center;justify-content:center;
+  font-size:10px;color:transparent;font-weight:800;flex:1;max-width:36px}
+.dd.on{border-color:transparent;color:#fff}
+.child-card{background:var(--white);border-radius:var(--r);box-shadow:var(--sh);
+  padding:12px 14px;margin-bottom:10px;display:flex;align-items:center;gap:12px}
+.av{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-family:"Fredoka One",cursive;font-size:14px;
+  color:#fff;flex-shrink:0}
+.child-info{flex:1;min-width:0}
+.child-name{font-weight:800;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.child-meta{font-size:11px;color:var(--muted);margin-top:2px}
+.child-score{text-align:right;flex-shrink:0}
+.score-val{font-family:"Fredoka One",cursive;font-size:20px}
+.score-lbl{font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase}
+.streak-badge{background:var(--gold-lt);color:var(--gold-dk);border-radius:20px;
+  padding:2px 8px;font-size:11px;font-weight:800}
+.bdg{display:inline-block;padding:2px 7px;border-radius:100px;font-size:10px;font-weight:800}
+.mini-dots{display:flex;gap:2px;flex-wrap:wrap;margin-top:4px}
+.md{width:14px;height:14px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:7px;color:#fff}
+.btn{padding:10px 16px;border-radius:10px;font-family:"Nunito",sans-serif;font-size:13px;
+  font-weight:700;cursor:pointer;border:none;transition:all .15s;display:inline-flex;
+  align-items:center;gap:5px;position:relative;z-index:2;touch-action:manipulation}
+.btn-primary{background:var(--navy);color:#fff}
+.btn-gold{background:var(--gold);color:var(--navy)}
+.btn-outline{background:transparent;color:var(--navy);border:1.5px solid var(--border)}
+.btn-green{background:var(--green);color:#fff}
+.btn-teal{background:var(--teal);color:#fff}
+.btn-red{background:var(--red);color:#fff}
+.btn-purple{background:var(--purple);color:#fff}
+.btn-block{width:100%;justify-content:center;padding:13px}
+.btn-sm{padding:7px 12px;font-size:12px;border-radius:8px}
+.btn-row{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.fr{margin-bottom:12px}
+.fl{font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.5px;margin-bottom:5px;display:block}
+select,input[type=text],input[type=number],input[type=date],input[type=email],
+input[type=password],textarea{border:1.5px solid var(--border);border-radius:10px;
+  padding:11px 12px;font-family:"Nunito",sans-serif;font-size:14px;font-weight:600;
+  color:var(--text);background:var(--bg);outline:none;width:100%;-webkit-appearance:none}
+textarea{resize:none;min-height:80px}
+select:focus,input:focus,textarea:focus{border-color:var(--sky)}
+.log-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.lf{background:var(--bg);border-radius:11px;padding:12px 10px;border:2px solid transparent;
+  cursor:pointer;transition:all .15s;display:flex;flex-direction:column;align-items:center;
+  gap:5px;text-align:center;touch-action:manipulation;user-select:none;
+  min-height:72px;justify-content:center}
+.lf:active{transform:scale(.96)}
+.lf.on{border-color:var(--green);background:var(--green-lt)}
+.lf-icon{font-size:22px;pointer-events:none}
+.lf-label{font-weight:700;font-size:11px;color:var(--text);pointer-events:none;line-height:1.3}
+.lf-check{width:20px;height:20px;border-radius:50%;border:2px solid var(--border);
+  display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;
+  background:var(--bg);margin-top:2px;pointer-events:none}
+.lf.on .lf-check{background:var(--green);border-color:var(--green)}
+.lf.on .lf-check::after{content:"\2713"}
+.mv-card{background:var(--white);border-radius:var(--r);box-shadow:var(--sh);
+  padding:14px;margin-bottom:10px;border-left:4px solid var(--teal)}
+.mv-ref{font-size:13px;font-weight:800;color:var(--teal);margin-bottom:4px}
+.mv-txt{font-size:13px;font-style:italic;color:var(--text);line-height:1.6;margin-bottom:8px}
+.att-dot{width:36px;height:36px;border-radius:50%;border:2px solid var(--border);
+  display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;
+  cursor:pointer;background:var(--bg);color:transparent;transition:all .15s;touch-action:manipulation}
+.att-dot:active{transform:scale(.9)}
+.att-dot.present{background:var(--green);border-color:var(--green);color:#fff}
+.att-dot.absent{background:var(--red-lt);border-color:var(--red);color:var(--red)}
+.att-dot.excused{background:var(--gold-lt);border-color:var(--gold);color:var(--gold-dk)}
+.sub-tabs{display:flex;gap:0;background:var(--bg);border-radius:10px;padding:3px;margin-bottom:12px}
+.sub-tab{flex:1;text-align:center;padding:8px 4px;border-radius:8px;font-size:12px;
+  font-weight:700;color:var(--muted);cursor:pointer;border:none;background:none;
+  font-family:"Nunito",sans-serif;touch-action:manipulation}
+.sub-tab.active{background:var(--white);color:var(--navy);box-shadow:0 1px 6px rgba(26,43,90,.1)}
+.chart-wrap{background:var(--white);border-radius:var(--r);box-shadow:var(--sh);
+  padding:14px;margin-bottom:12px}
+.chart-title{font-family:"Fredoka One",cursive;font-size:14px;color:var(--navy);margin-bottom:10px}
+.nf-row{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border)}
+.nf-row:last-child{border-bottom:none}
+.nf-ico{width:36px;height:36px;border-radius:10px;background:var(--teal-lt);
+  display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.lb-row{display:flex;align-items:center;gap:10px;padding:10px 0;
+  border-bottom:1px solid var(--border)}
+.lb-row:last-child{border-bottom:none}
+.lb-rank{font-family:"Fredoka One",cursive;font-size:18px;width:28px;text-align:center;flex-shrink:0}
+.wk-row{background:var(--white);border-radius:var(--r);box-shadow:var(--sh);padding:12px 14px;margin-bottom:10px}
+.wk-row-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.wk-num{font-family:"Fredoka One",cursive;font-size:14px;color:var(--navy)}
+.wk-dates{display:flex;gap:6px;flex-wrap:wrap}
+.overlay{display:none;position:fixed;inset:0;background:rgba(26,43,90,.6);z-index:200;
+  align-items:flex-end;justify-content:center}
+.overlay.open{display:flex}
+.modal{background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:92vh;
+  overflow-y:auto;animation:slideUp .3s ease;padding-bottom:env(safe-area-inset-bottom,16px)}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:none}}
+.mh{padding:16px 18px 12px;border-bottom:1px solid var(--border);display:flex;
+  align-items:center;justify-content:space-between;position:sticky;top:0;background:#fff;z-index:1}
+.mh-handle{width:40px;height:4px;border-radius:2px;background:var(--border);margin:0 auto 12px;display:block}
+.mt{font-family:"Fredoka One",cursive;font-size:18px;color:var(--navy)}
+.mc{background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);padding:4px}
+.mb{padding:16px 18px 20px}
+.wk-option{display:flex;align-items:center;justify-content:space-between;
+  padding:14px 0;border-bottom:1px solid var(--border);cursor:pointer}
+.wk-option:last-child{border-bottom:none}
+.wk-opt-name{font-weight:700;font-size:15px}
+.wk-opt-date{font-size:12px;color:var(--muted)}
+.wk-opt-check{font-size:18px;color:var(--green)}
+.cd-header{background:linear-gradient(135deg,var(--navy),var(--navy-mid));
+  padding:20px 18px;color:#fff;border-radius:20px 20px 0 0}
+.cd-av{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-family:"Fredoka One",cursive;font-size:20px;color:#fff;margin-bottom:8px}
+.cd-name{font-family:"Fredoka One",cursive;font-size:20px}
+.cd-sub{font-size:13px;opacity:.75}
+.search-bar{background:var(--white);border:1.5px solid var(--border);border-radius:12px;
+  padding:10px 14px;font-family:"Nunito",sans-serif;font-size:14px;font-weight:600;
+  color:var(--text);outline:none;width:100%;margin-bottom:12px}
+.search-bar:focus{border-color:var(--sky)}
+.qa-row{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:14px;scrollbar-width:none}
+.qa-row::-webkit-scrollbar{display:none}
+.qa-btn{flex-shrink:0;background:var(--white);border:1.5px solid var(--border);
+  border-radius:20px;padding:7px 14px;font-size:12px;font-weight:700;color:var(--navy);
+  cursor:pointer;font-family:"Nunito",sans-serif;touch-action:manipulation;white-space:nowrap;
+  display:flex;align-items:center;gap:5px}
+.qa-btn.active{background:var(--navy);color:#fff;border-color:var(--navy)}
+.section-divider{font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.5px;margin:16px 0 8px;display:flex;align-items:center;gap:8px}
+.section-divider::after{content:"";flex:1;height:1px;background:var(--border)}
+.stars{display:flex;gap:8px;margin-top:4px}
+.star{font-size:28px;cursor:pointer;color:var(--border);background:none;border:none;padding:4px}
+.star.on{color:var(--gold)}
+.det-f{background:var(--bg);border-radius:10px;padding:10px 12px;margin-bottom:8px}
+.det-f label{font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px}
+.det-f input,.det-f select{border:none;background:transparent;font-family:"Nunito",sans-serif;font-size:13px;font-weight:600;color:var(--text);outline:none;padding:0;width:100%}
+.toast{position:fixed;bottom:calc(var(--bottom-nav)+12px);left:50%;
+  transform:translateX(-50%) translateY(80px);background:var(--navy);color:#fff;
+  padding:10px 20px;border-radius:100px;font-weight:700;font-size:13px;
+  box-shadow:0 4px 20px rgba(26,43,90,.3);z-index:600;transition:transform .3s cubic-bezier(.4,2,.6,1);
+  pointer-events:none;white-space:nowrap;max-width:90vw;text-align:center}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.fab{position:fixed;right:16px;bottom:calc(var(--bottom-nav)+12px);width:52px;height:52px;
+  border-radius:50%;background:var(--gold);border:none;font-size:24px;cursor:pointer;
+  box-shadow:0 4px 16px rgba(245,166,35,.5);display:flex;align-items:center;justify-content:center;
+  z-index:19;touch-action:manipulation;transition:transform .15s}
+.fab:active{transform:scale(.92)}
+.scroll{padding-bottom:calc(var(--bottom-nav)+20px+env(safe-area-inset-bottom,0px))}
+
+/* ── SYNC INDICATOR ── */
+.sync-dot{width:8px;height:8px;border-radius:50%;background:var(--gold);flex-shrink:0;
+  animation:pulse 1.5s infinite}
+.sync-dot.ok{background:var(--green);animation:none}
+.sync-dot.err{background:var(--red);animation:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ── PORTAL ── */
+#portalWrap{position:fixed;inset:0;background:var(--bg);z-index:9999;
+  max-width:480px;margin:0 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+#portalWrap.hidden{display:none}
+.pt-scroll{padding:0 16px 40px;min-height:100%;}
+.pt-logo{text-align:center;padding:28px 0 16px;}
+.pt-logo-title{font-family:"Fredoka One",cursive;font-size:24px;color:var(--navy);}
+.pt-logo-sub{font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:3px;}
+.pt-roles{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0 18px;}
+.pt-role{background:var(--white);border-radius:var(--r);box-shadow:var(--sh);padding:20px 12px;
+  text-align:center;cursor:pointer;border:2.5px solid transparent;transition:border-color .15s,transform .1s;touch-action:manipulation;}
+.pt-role:active{transform:scale(.96);}
+.pt-role.selected{border-color:var(--navy);}
+.pt-role .ri{font-size:34px;display:block;margin-bottom:7px;}
+.pt-role .rl{font-family:"Fredoka One",cursive;font-size:15px;color:var(--navy);}
+.pt-role .rd{font-size:11px;color:var(--muted);margin-top:3px;font-weight:700;}
+.pt-form{background:var(--white);border-radius:var(--r);box-shadow:var(--sh);padding:16px;margin-bottom:14px;}
+.pt-form-hd{font-family:"Fredoka One",cursive;font-size:15px;color:var(--navy);margin-bottom:14px;}
+.pt-pin-row{display:flex;gap:10px;justify-content:center;margin:12px 0;}
+.pt-pin-box{width:52px;height:58px;border:2px solid var(--border);border-radius:12px;
+  font-size:24px;font-weight:900;font-family:"Fredoka One",cursive;text-align:center;
+  background:var(--bg);color:var(--navy);outline:none;}
+.pt-pin-box:focus{border-color:var(--gold);}
+.pt-err{background:var(--red-lt);border-radius:10px;padding:10px 12px;font-size:12px;
+  font-weight:800;color:var(--red);margin-bottom:10px;display:none;}
+.pt-err.show{display:block;}
+.pt-skip{text-align:center;font-size:12px;color:var(--muted);font-weight:700;cursor:pointer;
+  text-decoration:underline;margin-top:10px;padding-bottom:4px;}
+#ptDash{display:none;}
+.pt-hdr{background:linear-gradient(135deg,var(--navy),var(--navy-mid));padding:13px 16px 11px;
+  display:flex;align-items:center;gap:10px;flex-shrink:0;box-shadow:0 2px 10px rgba(0,0,0,.3);}
+.pt-hdr .av{font-family:"Fredoka One",cursive;font-size:14px;color:#fff;display:flex;
+  align-items:center;justify-content:center;flex-shrink:0;}
+.pt-hdr-info{flex:1;min-width:0;}
+.pt-hdr-name{font-family:"Fredoka One",cursive;font-size:16px;color:#fff;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pt-hdr-sub{font-size:10px;color:rgba(255,255,255,.65);font-weight:700;}
+.pt-logout-btn{background:rgba(255,255,255,.15);border:none;border-radius:20px;
+  padding:6px 12px;font-family:"Nunito",sans-serif;font-size:11px;font-weight:800;
+  color:#fff;cursor:pointer;flex-shrink:0;}
+.pt-datebar{background:var(--white);padding:9px 16px;display:flex;
+  justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);}
+.pt-datebar .dt{font-size:12px;font-weight:800;color:var(--muted);}
+.pt-datebar .sc{font-family:"Fredoka One",cursive;font-size:15px;color:var(--navy);}
+.pt-child-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+.pt-cp{background:var(--white);border-radius:var(--r);box-shadow:var(--sh);padding:14px 10px;
+  text-align:center;cursor:pointer;border:2.5px solid transparent;transition:all .15s;touch-action:manipulation;}
+.pt-cp:active{transform:scale(.96);}
+.pt-cp.selected{border-color:var(--gold);}
+.pt-cp .cn{font-family:"Fredoka One",cursive;font-size:13px;color:var(--navy);margin-top:6px;}
+.pt-cp .cs{font-size:12px;font-weight:800;margin-top:2px;}
+.pt-body{padding:12px 14px 60px;}
+.pt-prog-wrap{background:var(--white);border-radius:var(--r);box-shadow:var(--sh);padding:13px;margin-bottom:12px;}
+.pt-prog-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.pt-prog-top span{font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;}
+.pt-prog-top strong{font-family:"Fredoka One",cursive;font-size:18px;color:var(--navy);}
+.pt-pb{background:var(--bg);border-radius:100px;height:9px;overflow:hidden;}
+.pt-pb-fill{height:100%;border-radius:100px;background:linear-gradient(90deg,var(--navy),var(--sky));
+  transition:width .5s cubic-bezier(.4,2,.6,1);}
+.pt-verse{background:var(--white);border-radius:var(--r);box-shadow:var(--sh);padding:12px;
+  border-left:4px solid var(--teal);margin-bottom:12px;}
+.pt-verse .vr{font-size:10px;font-weight:800;color:var(--teal);text-transform:uppercase;margin-bottom:3px;}
+.pt-verse .vt{font-size:13px;font-style:italic;color:var(--text);line-height:1.6;}
+.pt-streak{background:var(--gold-lt);border-radius:var(--r);padding:10px 13px;
+  display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.pt-act-list{display:flex;flex-direction:column;gap:9px;margin-bottom:14px;}
+.pt-act{background:var(--white);border-radius:var(--r);box-shadow:var(--sh);padding:13px;
+  display:flex;align-items:center;gap:12px;cursor:pointer;border:2px solid transparent;
+  transition:all .15s;touch-action:manipulation;}
+.pt-act:active{transform:scale(.97);}
+.pt-act.done{border-color:var(--green);background:var(--green-lt);}
+.pt-act-icon{width:43px;height:43px;border-radius:11px;display:flex;align-items:center;
+  justify-content:center;font-size:22px;flex-shrink:0;}
+.pt-act-label{font-family:"Fredoka One",cursive;font-size:15px;color:var(--navy);}
+.pt-act.done .pt-act-label{color:#185a34;}
+.pt-act-desc{font-size:11px;color:var(--muted);margin-top:2px;font-weight:600;}
+.pt-act.done .pt-act-desc{color:var(--green);}
+.pt-check{width:29px;height:29px;flex-shrink:0;border-radius:50%;border:2px solid var(--border);
+  background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:15px;
+  color:transparent;transition:all .2s;}
+.pt-act.done .pt-check{background:var(--green);border-color:var(--green);color:#fff;}
+.pt-congrats{background:linear-gradient(135deg,var(--green-lt),var(--gold-lt));
+  border:2px solid var(--green);border-radius:var(--r);padding:18px;text-align:center;
+  margin-bottom:14px;display:none;}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════
+     FIREBASE SETUP SCREEN
+     (Shown when config is not yet filled in)
+══════════════════════════════════════════════ -->
+<div id="setupScreen">
+  <div class="su-logo">
+    <div style="font-size:48px;margin-bottom:8px;">⚔️</div>
+    <div class="su-logo-title">Joel Two Army</div>
+    <div class="su-logo-sub">Firebase Setup Guide</div>
+  </div>
+
+  <div style="background:var(--gold-lt);border-radius:var(--r);padding:14px;margin-bottom:16px;border-left:4px solid var(--gold);">
+    <div style="font-family:'Fredoka One',cursive;font-size:15px;color:var(--gold-dk);margin-bottom:4px;">⚡ One-time setup — takes ~10 minutes</div>
+    <div style="font-size:12px;color:var(--gold-dk);font-weight:700;line-height:1.7;">After this, your app will sync live across all phones and devices — no re-setup needed.</div>
+  </div>
+
+  <div class="su-step">
+    <div class="su-step-title"><span class="su-step-num">1</span> Create your Firebase project</div>
+    <div class="su-note">
+      1. Go to <strong>console.firebase.google.com</strong><br>
+      2. Click <strong>"Add project"</strong><br>
+      3. Name it <strong>joel-two-army</strong><br>
+      4. Disable Google Analytics (not needed)<br>
+      5. Click <strong>"Create project"</strong>
+    </div>
+  </div>
+
+  <div class="su-step">
+    <div class="su-step-title"><span class="su-step-num">2</span> Add a Web App</div>
+    <div class="su-note">
+      1. In your project, click the <strong>Web icon (&lt;/&gt;)</strong><br>
+      2. Name it <strong>Joel Two Army</strong><br>
+      3. Click <strong>Register app</strong><br>
+      4. Copy the <strong>firebaseConfig</strong> object shown<br>
+      5. Paste it in the file where it says <strong>PASTE_YOUR_API_KEY</strong> etc.
+    </div>
+  </div>
+
+  <div class="su-step">
+    <div class="su-step-title"><span class="su-step-num">3</span> Enable Authentication</div>
+    <div class="su-note">
+      1. In Firebase Console → <strong>Authentication</strong><br>
+      2. Click <strong>"Get started"</strong><br>
+      3. Enable <strong>Email/Password</strong> sign-in<br>
+      4. Create your leader account:<br>
+      &nbsp;&nbsp;→ Users tab → Add user<br>
+      &nbsp;&nbsp;→ Email: your email, set a password
+    </div>
+  </div>
+
+  <div class="su-step">
+    <div class="su-step-title"><span class="su-step-num">4</span> Create Firestore Database</div>
+    <div class="su-note">
+      1. Firebase Console → <strong>Firestore Database</strong><br>
+      2. Click <strong>"Create database"</strong><br>
+      3. Choose <strong>Production mode</strong><br>
+      4. Pick a server location closest to you<br>
+      5. Click <strong>Done</strong>
+    </div>
+  </div>
+
+  <div class="su-step">
+    <div class="su-step-title"><span class="su-step-num">5</span> Set Firestore Rules</div>
+    <div class="su-note">In Firestore → <strong>Rules</strong> tab, paste this:</div>
+    <div class="su-code">rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}</div>
+    <div class="su-note">Click <strong>Publish</strong></div>
+  </div>
+
+  <div class="su-step">
+    <div class="su-step-title"><span class="su-step-num">6</span> Host on GitHub Pages (free)</div>
+    <div class="su-note">
+      1. Go to <strong>github.com</strong> → sign in / create account<br>
+      2. Create a new repository called <strong>joel-army</strong><br>
+      3. Upload your HTML file<br>
+      4. Settings → Pages → Branch: main → Save<br>
+      5. Your app URL will be:<br>
+      <strong>yourusername.github.io/joel-army</strong><br><br>
+      Share this URL with all parents and children — everyone logs in from the same link!
+    </div>
+  </div>
+
+  <div style="background:var(--green-lt);border-radius:var(--r);padding:14px;margin-bottom:16px;border-left:4px solid var(--green);">
+    <div style="font-family:'Fredoka One',cursive;font-size:14px;color:#185a34;margin-bottom:4px;">✅ After setup is complete</div>
+    <div style="font-size:12px;color:var(--green);font-weight:700;line-height:1.7;">
+      Open the file, fill in your Firebase config, save it, then upload to GitHub. The setup screen will disappear and your live app will appear.
+    </div>
+  </div>
+
+  <button class="btn btn-gold btn-block" onclick="dismissSetup()">I've filled in my config — Continue anyway</button>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     CHILD / PARENT PORTAL
+══════════════════════════════════════════════ -->
+<div id="portalWrap">
+  <div id="ptLogin" class="pt-scroll">
+    <div class="pt-logo">
+      <div style="font-size:56px;margin-bottom:8px;">⚔️</div>
+      <div class="pt-logo-title">Joel Two Army</div>
+      <div class="pt-logo-sub">Daily Activity Tracker</div>
+      <div id="syncStatus" style="display:inline-flex;align-items:center;gap:6px;
+        background:var(--white);border-radius:20px;padding:4px 12px;margin-top:8px;
+        font-size:11px;font-weight:800;color:var(--muted);">
+        <span class="sync-dot" id="syncDot"></span>
+        <span id="syncTxt">Connecting…</span>
+      </div>
+    </div>
+
+    <div style="font-family:'Fredoka One',cursive;font-size:15px;color:var(--navy);text-align:center;margin-bottom:14px;">Who is logging in today?</div>
+
+    <div class="pt-roles">
+      <div class="pt-role" id="roleChild" onclick="ptSelectRole('child')">
+        <span class="ri">&#128587;</span>
+        <div class="rl">I'm a Child</div>
+        <div class="rd">Log my activities</div>
+      </div>
+      <div class="pt-role" id="roleParent" onclick="ptSelectRole('parent')">
+        <span class="ri">&#128106;</span>
+        <div class="rl">I'm a Parent</div>
+        <div class="rd">Check my child</div>
+      </div>
+    </div>
+
+    <div class="pt-form" id="ptFormWrap" style="display:none;">
+      <div class="pt-form-hd">&#9876;&#65039; <span id="ptFormTitle">Choose your name</span></div>
+      <div class="fr">
+        <label class="fl">Select Child</label>
+        <select id="ptChildSel" style="width:100%"><option value="">-- Loading children… --</option></select>
+      </div>
+      <div id="ptPinWrap" style="display:none;margin-top:10px;">
+        <label class="fl">Parent PIN (4 digits)</label>
+        <div class="pt-pin-row">
+          <input class="pt-pin-box" id="pin0" type="password" inputmode="numeric" maxlength="1" oninput="ptPinNext(0)">
+          <input class="pt-pin-box" id="pin1" type="password" inputmode="numeric" maxlength="1" oninput="ptPinNext(1)">
+          <input class="pt-pin-box" id="pin2" type="password" inputmode="numeric" maxlength="1" oninput="ptPinNext(2)">
+          <input class="pt-pin-box" id="pin3" type="password" inputmode="numeric" maxlength="1" oninput="ptPinNext(3)">
+        </div>
+        <div style="font-size:11px;color:var(--muted);text-align:center;font-weight:700;">Default PIN: 1234 (set per child in leader dashboard)</div>
+      </div>
+      <div class="pt-err" id="ptErr">&#9888;&#65039; Incorrect PIN. Please try again.</div>
+      <button class="btn btn-gold btn-block" onclick="ptLogin()" style="margin-top:12px;">&#128275; Enter Tracker</button>
+    </div>
+
+    <div style="background:var(--white);border-radius:var(--r);box-shadow:var(--sh);padding:14px;margin-bottom:14px;">
+      <div style="font-family:'Fredoka One',cursive;font-size:14px;color:var(--navy);margin-bottom:8px;">&#128274; Leader / Admin Login</div>
+      <div class="fr"><label class="fl">Email</label><input type="email" id="ldEmail" placeholder="your@email.com"></div>
+      <div class="fr"><label class="fl">Password</label><input type="password" id="ldPass" placeholder="••••••••"></div>
+      <button class="btn btn-primary btn-block" onclick="leaderLogin()">&#128272; Leader Sign In</button>
+    </div>
+
+    <div class="pt-skip" onclick="ptSkip()">Continue offline (demo mode)</div>
+  </div>
+
+  <!-- CHILD/PARENT TRACKER -->
+  <div id="ptDash">
+    <div class="pt-hdr">
+      <div class="av" id="ptAv" style="width:40px;height:40px;border-radius:50%;"></div>
+      <div class="pt-hdr-info">
+        <div class="pt-hdr-name" id="ptHdrName">Name</div>
+        <div class="pt-hdr-sub" id="ptHdrSub">Group</div>
+      </div>
+      <span class="sync-dot ok" id="ptSyncDot" style="margin-right:4px;"></span>
+      <button class="pt-logout-btn" onclick="ptLogout()">Log out</button>
+    </div>
+    <div class="pt-datebar">
+      <span class="dt" id="ptDate"></span>
+      <span class="sc" id="ptScore">0 / 8</span>
+    </div>
+    <div id="ptParentPick" class="pt-body" style="display:none;">
+      <div style="font-family:'Fredoka One',cursive;font-size:16px;color:var(--navy);margin-bottom:12px;">&#128106; Select a child to review</div>
+      <div class="pt-child-grid" id="ptChildGrid"></div>
+    </div>
+    <div class="pt-body" id="ptTrackerBody" style="display:none;">
+      <button id="ptBackBtn" class="btn btn-outline btn-sm" onclick="ptShowParentPick()" style="margin-bottom:12px;display:none;">&#8592; Back</button>
+      <div class="pt-verse" id="ptVerse"></div>
+      <div class="pt-streak" id="ptStreak"></div>
+      <div class="pt-prog-wrap">
+        <div class="pt-prog-top"><span>Today's Progress</span><strong id="ptProgTxt">0 / 8</strong></div>
+        <div class="pt-pb"><div class="pt-pb-fill" id="ptProgFill" style="width:0%"></div></div>
+      </div>
+      <div class="pt-congrats" id="ptCongrats">
+        <span style="font-size:40px;display:block;margin-bottom:6px;">&#127942;</span>
+        <strong style="font-family:'Fredoka One',cursive;font-size:17px;color:#185a34;display:block;">Well done, Soldier!</strong>
+        <span style="font-size:13px;color:var(--green);font-weight:700;">All activities completed. God is proud of you!</span>
+      </div>
+      <div class="pt-act-list" id="ptActList"></div>
+      <button id="ptSaveBtn" class="btn btn-gold btn-block" onclick="ptSaveAll()">&#128190; Save to Cloud &#9729;&#65039;</button>
+      <div id="ptSaveStatus" style="text-align:center;font-size:12px;color:var(--muted);font-weight:700;margin-top:8px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     LEADER DASHBOARD
+══════════════════════════════════════════════ -->
+<div id="leaderApp" style="display:none;flex-direction:column;height:100%;">
+  <div class="hdr">
+    <div style="flex:1">
+      <div class="hdr-name">Joel Two Army &#9876;&#65039;</div>
+      <div class="hdr-sub" id="hdrSubTxt">Leader Dashboard</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span class="sync-dot" id="ldSyncDot"></span>
+      <button class="hdr-week" id="hdrWeekBtn" onclick="openM('wkSheet')">Week 1 &#9660;</button>
+      <button class="btn btn-sm" style="background:rgba(255,255,255,.15);color:#fff;border:none;font-size:11px;" onclick="leaderSignOut()">&#128275; Out</button>
+    </div>
+  </div>
+
+  <div class="scroll" id="scrollArea">
+    <div class="view active" id="view-dashboard">
+      <div class="ov-grid" id="ovGrid"></div>
+      <div class="stitle"><span class="dot"></span>Accountability Pillars</div>
+      <div class="pil-list" id="pilList"></div>
+    </div>
+
+    <div class="view" id="view-children">
+      <input class="search-bar" id="srch" placeholder="&#128269;  Search child name…" oninput="renderChildren()">
+      <div class="qa-row" id="grpFilter">
+        <button class="qa-btn active" data-grp="all" onclick="setGrp('all',this)">All Groups</button>
+        <button class="qa-btn" data-grp="lions" onclick="setGrp('lions',this)">&#129409; Lions</button>
+        <button class="qa-btn" data-grp="eagles" onclick="setGrp('eagles',this)">&#129413; Eagles</button>
+        <button class="qa-btn" data-grp="warriors" onclick="setGrp('warriors',this)">&#9876;&#65039; Warriors</button>
+      </div>
+      <div id="childList"></div>
+      <div class="section-divider">Leaderboard</div>
+      <div class="card card-p" id="lbCard"></div>
+    </div>
+
+    <div class="view" id="view-log">
+      <div class="fr"><label class="fl">Select Child</label>
+        <select id="logCS" onchange="onLogCC()" style="width:100%"><option value="">-- Choose a child --</option></select>
+      </div>
+      <div id="logCI" style="margin-bottom:12px"></div>
+      <div class="fr"><label class="fl">Day</label>
+        <select id="logDS" style="width:100%"><option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option></select>
+      </div>
+      <div class="stitle" style="margin-top:4px"><span class="dot"></span>&#128591; Prayer</div>
+      <div class="log-grid" id="lfP"></div>
+      <div class="stitle"><span class="dot"></span>&#128214; Bible Reading</div>
+      <div class="det-f"><label>Passage Read</label><input id="fPass" type="text" placeholder="e.g. John 3:1-21"></div>
+      <div class="det-f"><label>Understood?</label><select id="fUnd"><option value="">--</option><option>Yes - fully</option><option>Partially</option><option>Needs help</option></select></div>
+      <div class="log-grid" id="lfW"></div>
+      <div class="stitle"><span class="dot"></span>&#128161; Memory Verse</div>
+      <div class="det-f"><label>Verse Practiced?</label><select id="fMP"><option value="">--</option><option>Yes</option><option>No</option></select></div>
+      <div class="det-f"><label>Recited Correctly?</label><select id="fRec"><option value="">--</option><option>Yes - perfectly</option><option>Almost</option><option>Not yet</option></select></div>
+      <div class="stitle"><span class="dot"></span>&#127925; Worship &amp; Waiting</div>
+      <div class="log-grid" id="lfWo"></div>
+      <div class="det-f"><label>What did God say?</label><input id="fGod" type="text" placeholder="Child's response…"></div>
+      <div class="stitle"><span class="dot"></span>&#10084;&#65039; Character &amp; Home</div>
+      <div class="log-grid" id="lfC"></div>
+      <div class="det-f"><label>Character Example</label><input id="fCex" type="text" placeholder="e.g. helped sibling…"></div>
+      <div class="det-f"><label>Obeyed Parents?</label><select id="fOb"><option value="">--</option><option>Yes</option><option>Mostly</option><option>No</option></select></div>
+      <div class="stitle"><span class="dot"></span>&#128218; Academic &amp; Leadership</div>
+      <div class="log-grid" id="lfA"></div>
+      <div style="margin-top:8px"><label class="fl">Overall Rating</label><div class="stars" id="logStars"></div></div>
+      <div style="margin-top:12px"><label class="fl">Mentor Notes</label><textarea id="logN" placeholder="Observations, breakthroughs…"></textarea></div>
+      <div class="btn-row">
+        <button class="btn btn-gold btn-block" onclick="saveLog()">&#128190; Save to Cloud</button>
+        <button class="btn btn-green btn-block" onclick="saveWA()">&#128172; Save + WhatsApp Parent</button>
+        <button class="btn btn-outline btn-block" onclick="clearLog()">&#128260; Clear</button>
+      </div>
+    </div>
+
+    <div class="view" id="view-memory">
+      <div class="card card-p" style="margin-bottom:12px">
+        <div class="stitle" style="margin-bottom:10px"><span class="dot"></span>Assign Verse</div>
+        <div class="fr"><label class="fl">Week</label><select id="mvWk" onchange="mvInfo()" style="width:100%"></select></div>
+        <div id="mvWI" style="font-size:12px;color:var(--teal);font-weight:700;margin-bottom:8px"></div>
+        <div class="fr"><label class="fl">Scripture Reference</label><input type="text" id="mvRef" placeholder="e.g. Psalm 119:11"></div>
+        <div class="fr"><label class="fl">Verse Text</label><textarea id="mvTxt" placeholder="Type the full verse here…"></textarea></div>
+        <div class="fr"><label class="fl">Theme</label><input type="text" id="mvThm" placeholder="e.g. The Word of God"></div>
+        <div class="fr"><label class="fl">Assign To</label><select id="mvGrp" style="width:100%"><option value="all">All Groups</option><option value="lions">&#129409; Lions</option><option value="eagles">&#129413; Eagles</option><option value="warriors">&#9876;&#65039; Warriors</option></select></div>
+        <button class="btn btn-gold btn-block" onclick="saveMV()" style="margin-top:4px">&#128204; Save Verse to Cloud</button>
+      </div>
+      <div class="section-divider">Assigned Verses</div>
+      <div id="mvList"></div>
+    </div>
+
+    <div class="view" id="view-attendance">
+      <div class="ov-grid" id="attSum" style="margin-bottom:14px"></div>
+      <div class="qa-row">
+        <button class="btn btn-green btn-sm" onclick="markAll()">&#10003; All Present</button>
+        <button class="btn btn-outline btn-sm" onclick="exportAtt()">&#128228; Export CSV</button>
+      </div>
+      <div style="display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap">
+        <span style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700"><span style="width:12px;height:12px;border-radius:50%;background:var(--green);display:inline-block"></span>Present</span>
+        <span style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700"><span style="width:12px;height:12px;border-radius:50%;background:var(--red);display:inline-block"></span>Absent</span>
+        <span style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700"><span style="width:12px;height:12px;border-radius:50%;background:var(--gold);display:inline-block"></span>Excused</span>
+      </div>
+      <div id="attList"></div>
+    </div>
+
+    <div class="view" id="view-more">
+      <div class="sub-tabs">
+        <button class="sub-tab active" onclick="subTab('charts',this)">&#128202; Charts</button>
+        <button class="sub-tab" onclick="subTab('notifs',this)">&#128276; Notify</button>
+        <button class="sub-tab" onclick="subTab('weeks',this)">&#128197; Weeks</button>
+        <button class="sub-tab" onclick="subTab('manage',this)">&#128101; Manage</button>
+      </div>
+      <div id="subCharts">
+        <div class="chart-wrap"><div class="chart-title">&#128200; Score Trend</div><div style="position:relative;height:200px"><canvas id="chT"></canvas></div></div>
+        <div class="chart-wrap"><div class="chart-title">&#127919; Pillar Completion</div><div style="position:relative;height:200px"><canvas id="chP"></canvas></div></div>
+        <div class="chart-wrap"><div class="chart-title">&#128202; Individual Progress</div><div style="position:relative;height:220px"><canvas id="chI"></canvas></div></div>
+      </div>
+      <div id="subNotifs" style="display:none">
+        <div class="fr"><label class="fl">Child</label><select id="nfCh" onchange="nfPrev()" style="width:100%"><option value="">-- Choose --</option></select></div>
+        <div class="fr"><label class="fl">Message Type</label>
+          <select id="nfTy" onchange="nfPrev()" style="width:100%">
+            <option value="progress">&#11088; Weekly Progress Update</option>
+            <option value="verse">&#128214; Memory Verse Assignment</option>
+            <option value="praise">&#127881; Great Performance Praise</option>
+            <option value="encourage">&#128170; Needs Encouragement</option>
+            <option value="attendance">&#128203; Attendance Notice</option>
+            <option value="custom">&#9997;&#65039; Custom Message</option>
+          </select>
+        </div>
+        <div class="fr"><label class="fl">Message (editable)</label><textarea id="nfMsg" style="min-height:120px"></textarea></div>
+        <div class="btn-row">
+          <button class="btn btn-green btn-block" onclick="doWA()">&#128172; Send via WhatsApp</button>
+          <button class="btn btn-purple btn-block" onclick="doSMS()">&#128203; Copy SMS</button>
+          <button class="btn btn-outline btn-block" onclick="bulkNotif()">&#128242; Notify All Parents</button>
+        </div>
+        <div class="section-divider">Sent Log</div>
+        <div id="nfLog"></div>
+      </div>
+      <div id="subWeeks" style="display:none">
+        <button class="btn btn-gold btn-block" onclick="addWk()" style="margin-bottom:12px">+ Add Week</button>
+        <div id="wkMgr"></div>
+      </div>
+      <div id="subManage" style="display:none">
+        <div class="card card-p" style="margin-bottom:12px">
+          <div class="stitle" style="margin-bottom:12px"><span class="dot"></span>&#128101; Children Management</div>
+          <div style="font-size:12px;color:var(--muted);font-weight:700;margin-bottom:10px;">All children are stored in Firebase. Add new ones below or tap a child card to edit their PIN.</div>
+          <button class="btn btn-gold btn-block" onclick="openM('addModal')">+ Add New Child</button>
+        </div>
+        <div id="manageChildList"></div>
+      </div>
+    </div>
+  </div>
+
+  <button class="fab" onclick="openM('addModal')" title="Add Child">+</button>
+
+  <div class="bottom-nav">
+    <button class="bn-btn active" data-view="dashboard" onclick="sv('dashboard',this)">
+      <span class="ico">&#127968;</span>Dashboard<span class="active-dot"></span>
+    </button>
+    <button class="bn-btn" data-view="children" onclick="sv('children',this)">
+      <span class="ico">&#128102;</span>Children<span class="active-dot"></span>
+    </button>
+    <button class="bn-btn" data-view="log" onclick="sv('log',this)">
+      <span class="ico">&#9997;&#65039;</span>Log<span class="active-dot"></span>
+    </button>
+    <button class="bn-btn" data-view="memory" onclick="sv('memory',this)">
+      <span class="ico">&#128214;</span>Verses<span class="active-dot"></span>
+    </button>
+    <button class="bn-btn" data-view="attendance" onclick="sv('attendance',this)">
+      <span class="ico">&#128203;</span>Attend<span class="active-dot"></span>
+    </button>
+    <button class="bn-btn" data-view="more" onclick="sv('more',this);initCharts()">
+      <span class="ico">&#9881;&#65039;</span>More<span class="active-dot"></span>
+    </button>
+  </div>
+</div>
+
+<!-- MODALS -->
+<div class="overlay" id="wkSheet">
+  <div class="modal">
+    <span class="mh-handle"></span>
+    <div class="mh"><div class="mt">&#128197; Select Week</div><button class="mc" onclick="closeM('wkSheet')">&#10005;</button></div>
+    <div class="mb" id="wkOptions"></div>
+  </div>
+</div>
+
+<div class="overlay" id="addModal">
+  <div class="modal">
+    <span class="mh-handle"></span>
+    <div class="mh"><div class="mt">&#9876;&#65039; Add New Child</div><button class="mc" onclick="closeM('addModal')">&#10005;</button></div>
+    <div class="mb">
+      <div class="fr"><label class="fl">Full Name</label><input type="text" id="nName" placeholder="e.g. Samuel Adeyemi"></div>
+      <div class="fr"><label class="fl">Age</label><input type="number" id="nAge" placeholder="9" min="4" max="18"></div>
+      <div class="fr"><label class="fl">Group</label><select id="nGrp"><option value="lions">&#129409; Lions (6-8)</option><option value="eagles">&#129413; Eagles (9-11)</option><option value="warriors">&#9876;&#65039; Warriors (12-14)</option></select></div>
+      <div class="fr"><label class="fl">Parent Name</label><input type="text" id="nPar" placeholder="e.g. Mrs. Adeyemi"></div>
+      <div class="fr"><label class="fl">Parent WhatsApp</label><input type="text" id="nCon" placeholder="+234 801 234 5678"></div>
+      <div class="fr"><label class="fl">Child PIN (4 digits)</label><input type="text" id="nPin" placeholder="1234" maxlength="4" inputmode="numeric"></div>
+      <div class="btn-row"><button class="btn btn-gold btn-block" onclick="addChild()">&#9876;&#65039; Add to Army &amp; Save to Cloud</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="childModal">
+  <div class="modal">
+    <span class="mh-handle"></span>
+    <div class="cd-header" id="cdHead"></div>
+    <div class="mb" id="cdBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toastEl"></div>
+
+<script>
+/* ══════════════════════════════════════════
+   CONSTANTS & STATE
+══════════════════════════════════════════ */
+const PILS=[
+  {id:"prayer",   label:"Prayer",         icon:"🙏", color:"#8E44AD"},
+  {id:"word",     label:"Bible Reading",  icon:"📖", color:"#2980B9"},
+  {id:"memory",   label:"Memory Verse",   icon:"💡", color:"#F39C12"},
+  {id:"worship",  label:"Worship",        icon:"🎵", color:"#E91E8C"},
+  {id:"waiting",  label:"Waiting on God", icon:"🕊️", color:"#16A085"},
+  {id:"character",label:"Character",      icon:"❤️", color:"#C0392B"},
+  {id:"academic", label:"Academic",       icon:"📚", color:"#27AE60"},
+  {id:"leadership",label:"Leadership",    icon:"⭐", color:"#F5A623"},
+];
+const DAYS=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+const DS=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+const AC=["#E74C3C","#3498DB","#2ECC71","#9B59B6","#F39C12","#1ABC9C","#E91E8C","#F5A623","#16A085","#8E44AD","#E67E22","#2C3E50"];
+const GRP={lions:{label:"🦁 Lions",color:"#E67E22"},eagles:{label:"🦅 Eagles",color:"#2980B9"},warriors:{label:"⚔️ Warriors",color:"#8E44AD"}};
+const LSECS=[
+  {id:"lfP", f:[{id:"mp",l:"Morning Prayer",i:"🌅"},{id:"ep",l:"Evening Prayer",i:"🌙"}]},
+  {id:"lfW", f:[{id:"br",l:"Bible Reading",i:"📖"}]},
+  {id:"lfWo",f:[{id:"wo",l:"Worship Done",i:"🎵"},{id:"qt",l:"Quiet Time",i:"🌿"},{id:"wa",l:"Waited on God",i:"🕊️"}]},
+  {id:"lfC", f:[{id:"ch",l:"Character",i:"❤️"},{id:"ki",l:"Kindness",i:"🤝"}]},
+  {id:"lfA", f:[{id:"ac",l:"Academic Work",i:"📚"},{id:"le",l:"Leadership",i:"⭐"}]},
+];
+const PT_ACTS=[
+  {id:"prayer",   name:"Prayer",           desc:"Morning & evening prayer",      icon:"🙏", color:"#8E44AD",bg:"#F5EEF8"},
+  {id:"word",     name:"Bible Reading",    desc:"Read & reflect on God's Word",  icon:"📖", color:"#2980B9",bg:"#EBF5FB"},
+  {id:"memory",   name:"Memory Verse",     desc:"Practise your weekly verse",    icon:"💡", color:"#F39C12",bg:"#FEF9E7"},
+  {id:"worship",  name:"Worship",          desc:"Praise and worship session",    icon:"🎵", color:"#E91E8C",bg:"#FCE4F3"},
+  {id:"waiting",  name:"Waiting on God",   desc:"Quiet time, listen to God",     icon:"🕊️", color:"#16A085",bg:"#E0F5F1"},
+  {id:"character",name:"Character & Home", desc:"Chores, manners, home duties",  icon:"❤️", color:"#C0392B",bg:"#FDEDEC"},
+  {id:"academic", name:"Academic",         desc:"Schoolwork and study time",     icon:"📚", color:"#27AE60",bg:"#E9F7EF"},
+  {id:"leadership",name:"Leadership",      desc:"Service & responsibility",      icon:"⭐", color:"#F5A623",bg:"#FFF8E8"},
+];
+
+let ch=[],mvs=[],sentN=[],weeks=[],awId=1,idC=100,logStar=0,logSt={},curGrp="all",charts={};
+let ptRole=null,ptViewChild=null,ptParentMode=false,ptDoneToday={};
+let fbReady=false,currentUser=null,unsubChildren=null,unsubMvs=null;
+
+const todayKey=()=>DAYS[new Date().getDay()===0?6:new Date().getDay()-1];
+const ini=n=>n.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
+const sc=s=>s>=75?"#27AE60":s>=50?"#F39C12":"#E74C3C";
+function cScore(c){let d=0,t=0;PILS.forEach(p=>DAYS.forEach(dy=>{t++;if(c.logs&&c.logs[p.id]&&c.logs[p.id][dy])d++;}));return Math.round(d/t*100);}
+function aRate(c){const v=Object.values(c.att||{});return v.length?Math.round(v.filter(x=>x==="present").length/v.length*100):0;}
+function gf(){return curGrp==="all"?[...ch]:ch.filter(c=>c.g===curGrp);}
+function aw(){return weeks.find(w=>w.id===awId)||weeks[0]||{label:"Week 1",id:1};}
+
+/* ══════════════════════════════════════════
+   SETUP SCREEN
+══════════════════════════════════════════ */
+function dismissSetup(){document.getElementById('setupScreen').classList.add('hidden');}
+window.addEventListener('fbReady',()=>{
+  fbReady=true;
+  const {CONFIGURED,auth,onAuthStateChanged}=window._fb;
+  if(!CONFIGURED){
+    document.getElementById('setupScreen').classList.remove('hidden');
+    setSyncStatus('err','Not configured');
+    return;
+  }
+  document.getElementById('setupScreen').classList.add('hidden');
+  setSyncStatus('ok','Connected');
+  onAuthStateChanged(auth,user=>{
+    currentUser=user;
+    if(user){showLeaderDash();}
+    else{loadFirebaseData();}
+  });
+});
+
+function setSyncStatus(state,txt){
+  ['syncDot','ldSyncDot','ptSyncDot'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){el.className='sync-dot'+(state==='ok'?' ok':state==='err'?' err':'');}
+  });
+  const t=document.getElementById('syncTxt');
+  if(t)t.textContent=txt;
+}
+
+/* ══════════════════════════════════════════
+   FIREBASE DATA
+══════════════════════════════════════════ */
+async function loadFirebaseData(){
+  if(!fbReady||!window._fb.CONFIGURED){loadDemoData();return;}
+  const {db,collection,onSnapshot,query,orderBy}=window._fb;
+  setSyncStatus('','Syncing…');
+  try{
+    // Live children listener
+    unsubChildren&&unsubChildren();
+    unsubChildren=onSnapshot(collection(db,'children'),(snap)=>{
+      ch=snap.docs.map(d=>({id:d.id,...d.data(),logs:d.data().logs||{},att:d.data().att||{}}));
+      ch.forEach(c=>PILS.forEach(p=>{if(!c.logs[p.id])c.logs[p.id]={};DAYS.forEach(d=>{if(c.logs[p.id][d]===undefined)c.logs[p.id][d]=false;});}));
+      ptPopSel();bldSel();ra();if(ptViewChild){const updated=ch.find(x=>x.id===ptViewChild.id);if(updated)ptViewChild=updated;}
+      setSyncStatus('ok','Live ✓');
+    });
+    // Live memory verse listener
+    unsubMvs&&unsubMvs();
+    unsubMvs=onSnapshot(collection(db,'verses'),(snap)=>{
+      mvs=snap.docs.map(d=>({...d.data(),docId:d.id}));
+      mvs.sort((a,b)=>a.wk-b.wk);
+      renderMV();
+    });
+    // Weeks
+    const wSnap=await window._fb.getDocs(collection(db,'weeks'));
+    if(wSnap.empty){weeks=[{id:1,label:"Week 1",s:"",e:""}];await saveWeeksToFb();}
+    else{weeks=wSnap.docs.map(d=>d.data());weeks.sort((a,b)=>a.id-b.id);}
+    awId=weeks[0].id;popWks();
+  }catch(e){
+    console.error(e);
+    setSyncStatus('err','Offline');
+    loadDemoData();
+    toast('⚠️ Using offline demo data');
+  }
+}
+
+function loadDemoData(){
+  weeks=[{id:1,label:"Week 1",s:"2026-01-06",e:"2026-01-12"},{id:2,label:"Week 2",s:"2026-01-13",e:"2026-01-19"},{id:3,label:"Week 3",s:"2026-01-20",e:"2026-01-26"}];
+  awId=3;
+  ch=[
+    {id:"demo1",name:"Zion Adeyemi",   age:8, g:"lions",   par:"Mrs. Adeyemi",    con:"+2348012345678",st:5,av:0,pin:"1234",logs:{},att:{}},
+    {id:"demo2",name:"Esther Okonkwo", age:10,g:"eagles",  par:"Mr. Okonkwo",     con:"+2348023456789",st:7,av:1,pin:"1234",logs:{},att:{}},
+    {id:"demo3",name:"David Babatunde",age:12,g:"warriors", par:"Pastor Babatunde",con:"+2348034567890",st:3,av:2,pin:"1234",logs:{},att:{}},
+    {id:"demo4",name:"Grace Eze",      age:9, g:"eagles",  par:"Mrs. Eze",        con:"+2348045678901",st:6,av:3,pin:"1234",logs:{},att:{}},
+    {id:"demo5",name:"Samuel Okoro",   age:13,g:"warriors", par:"Deacon Okoro",   con:"+2348056789012",st:4,av:4,pin:"1234",logs:{},att:{}},
+  ];
+  ch.forEach(c=>{PILS.forEach(p=>{c.logs[p.id]={};DAYS.forEach(d=>{c.logs[p.id][d]=Math.random()>.4;});});DAYS.forEach(d=>{const r=Math.random();c.att[d]=r>.15?"present":r>.07?"excused":"absent";});});
+  mvs=[{wk:3,ref:"Psalm 119:11",txt:"I have hidden your word in my heart that I might not sin against you.",th:"Hiding the Word",grp:"all"}];
+  ptPopSel();bldSel();popWks();ra();
+}
+
+async function saveToFb(childObj){
+  if(!fbReady||!window._fb.CONFIGURED||!currentUser)return;
+  try{
+    const{db,doc,setDoc}=window._fb;
+    const d={...childObj};delete d.id;
+    await setDoc(doc(db,'children',String(childObj.id)),d);
+  }catch(e){console.error('Save error',e);}
+}
+
+async function saveWeeksToFb(){
+  if(!fbReady||!window._fb.CONFIGURED||!currentUser)return;
+  try{
+    const{db,doc,setDoc}=window._fb;
+    for(const w of weeks)await setDoc(doc(db,'weeks',String(w.id)),w);
+  }catch(e){console.error(e);}
+}
+
+/* ══════════════════════════════════════════
+   AUTH
+══════════════════════════════════════════ */
+async function leaderLogin(){
+  const email=document.getElementById('ldEmail').value.trim();
+  const pass=document.getElementById('ldPass').value;
+  if(!email||!pass){toast('⚠️ Enter email and password');return;}
+  if(!fbReady||!window._fb.CONFIGURED){toast('⚠️ Firebase not configured yet');return;}
+  try{
+    await window._fb.signInWithEmailAndPassword(window._fb.auth,email,pass);
+    toast('✅ Signed in as leader!');
+  }catch(e){toast('❌ '+e.message);}
+}
+
+function leaderSignOut(){
+  if(window._fb&&window._fb.CONFIGURED)window._fb.signOut(window._fb.auth);
+  currentUser=null;
+  document.getElementById('leaderApp').style.display='none';
+  document.getElementById('portalWrap').classList.remove('hidden');
+  toast('👋 Signed out');
+}
+
+function showLeaderDash(){
+  document.getElementById('portalWrap').classList.add('hidden');
+  document.getElementById('leaderApp').style.display='flex';
+  loadFirebaseData();
+  setSyncStatus('ok','Live ✓');
+  document.getElementById('hdrSubTxt').textContent='Leader: '+currentUser.email;
+}
+
+/* ══════════════════════════════════════════
+   PORTAL — CHILD / PARENT
+══════════════════════════════════════════ */
+function ptPopSel(){
+  const sel=document.getElementById('ptChildSel');
+  if(!sel)return;
+  sel.innerHTML='<option value="">-- Choose --</option>'+ch.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+}
+
+function ptSelectRole(role){
+  ptRole=role;
+  document.querySelectorAll('.pt-role').forEach(r=>r.classList.remove('selected'));
+  document.getElementById(role==='child'?'roleChild':'roleParent').classList.add('selected');
+  document.getElementById('ptFormWrap').style.display='block';
+  document.getElementById('ptFormTitle').textContent=role==='child'?'Choose your name':'Choose your child';
+  document.getElementById('ptPinWrap').style.display=role==='parent'?'block':'none';
+  document.getElementById('ptErr').classList.remove('show');
+}
+
+function ptPinNext(i){const v=document.getElementById('pin'+i).value;if(v&&i<3)document.getElementById('pin'+(i+1)).focus();}
+function ptGetPin(){return[0,1,2,3].map(i=>document.getElementById('pin'+i).value).join('');}
+
+function ptLogin(){
+  const cid=document.getElementById('ptChildSel').value;
+  if(!cid){toast('⚠️ Please select a child first');return;}
+  const child=ch.find(c=>String(c.id)===String(cid));
+  if(!child){toast('⚠️ Child not found');return;}
+  if(ptRole==='parent'){
+    const pin=ptGetPin();
+    const expected=child.pin||'1234';
+    if(pin!==expected){document.getElementById('ptErr').classList.add('show');[0,1,2,3].forEach(i=>{document.getElementById('pin'+i).value='';});document.getElementById('pin0').focus();return;}
+    ptParentMode=true;
+  }else{ptParentMode=false;}
+  ptViewChild=child;
+  if(!ptDoneToday[child.id])ptDoneToday[child.id]={};
+  PT_ACTS.forEach(a=>{if(ptDoneToday[child.id][a.id]===undefined)ptDoneToday[child.id][a.id]=!!(child.logs[a.id]&&child.logs[a.id][todayKey()]);});
+  ptOpenDash();
+}
+
+function ptSkip(){document.getElementById('portalWrap').classList.add('hidden');loadDemoData();showLeaderDash();}
+
+function ptOpenDash(){
+  document.getElementById('ptLogin').style.display='none';
+  document.getElementById('ptDash').style.display='block';
+  const ac=AC[ptViewChild.av%AC.length];
+  const av=document.getElementById('ptAv');
+  av.textContent=ini(ptViewChild.name);av.style.background=ac;av.style.width='40px';av.style.height='40px';av.style.borderRadius='50%';
+  document.getElementById('ptHdrName').textContent=ptViewChild.name;
+  document.getElementById('ptHdrSub').textContent=(ptParentMode?'Parent View · ':'')+GRP[ptViewChild.g].label+' · Age '+ptViewChild.age;
+  document.getElementById('ptDate').textContent=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  if(ptParentMode)ptShowParentPick();else ptShowTracker();
+}
+
+function ptShowParentPick(){
+  document.getElementById('ptParentPick').style.display='block';
+  document.getElementById('ptTrackerBody').style.display='none';
+  document.getElementById('ptChildGrid').innerHTML=ch.map(c=>{
+    const s=cScore(c),ac=AC[c.av%AC.length];
+    if(!ptDoneToday[c.id])ptDoneToday[c.id]={};
+    const done=PT_ACTS.filter(a=>ptDoneToday[c.id][a.id]).length;
+    return`<div class="pt-cp" onclick="ptParentPickChild('${c.id}')">
+      <div class="av" style="background:${ac};width:44px;height:44px;font-size:15px;margin:0 auto;">${ini(c.name)}</div>
+      <div class="cn">${c.name.split(' ')[0]}</div>
+      <div class="cs" style="color:${sc(s)}">${done}/8 · ${s}%</div>
+    </div>`;
+  }).join('');
+}
+
+function ptParentPickChild(cid){
+  const child=ch.find(c=>String(c.id)===String(cid));if(!child)return;
+  ptViewChild=child;
+  if(!ptDoneToday[child.id])ptDoneToday[child.id]={};
+  PT_ACTS.forEach(a=>{if(ptDoneToday[child.id][a.id]===undefined)ptDoneToday[child.id][a.id]=!!(child.logs[a.id]&&child.logs[a.id][todayKey()]);});
+  const ac=AC[child.av%AC.length];
+  document.getElementById('ptAv').textContent=ini(child.name);document.getElementById('ptAv').style.background=ac;
+  document.getElementById('ptHdrName').textContent=child.name;
+  document.getElementById('ptHdrSub').textContent='Parent View · '+GRP[child.g].label;
+  ptShowTracker();
+}
+
+function ptShowTracker(){
+  document.getElementById('ptParentPick').style.display='none';
+  document.getElementById('ptTrackerBody').style.display='block';
+  document.getElementById('ptBackBtn').style.display=ptParentMode?'inline-flex':'none';
+  document.getElementById('ptSaveBtn').style.display=ptParentMode?'none':'block';
+  const curV=mvs[mvs.length-1];
+  document.getElementById('ptVerse').innerHTML=curV
+    ?`<div class="vr">📖 Memory Verse · ${curV.ref}</div><div class="vt">"${curV.txt}"</div>`
+    :`<div class="vr">📖 Memory Verse</div><div class="vt" style="color:var(--muted)">No verse assigned yet.</div>`;
+  document.getElementById('ptStreak').innerHTML=`<span style="font-size:28px">🔥</span><div><div style="font-family:'Fredoka One',cursive;font-size:20px;color:var(--gold-dk)">🔥 ${ptViewChild.st||0} day streak</div><span style="font-size:11px;color:var(--gold-dk);font-weight:700">Keep going — don't break the chain!</span></div>`;
+  ptRenderActs();
+}
+
+function ptRenderActs(){
+  const done=PT_ACTS.filter(a=>ptDoneToday[ptViewChild.id]&&ptDoneToday[ptViewChild.id][a.id]).length;
+  const total=PT_ACTS.length,pct=Math.round(done/total*100);
+  document.getElementById('ptScore').textContent=done+' / '+total+' done';
+  document.getElementById('ptProgTxt').textContent=done+' / '+total;
+  document.getElementById('ptProgFill').style.width=pct+'%';
+  document.getElementById('ptCongrats').style.display=done===total?'block':'none';
+  document.getElementById('ptActList').innerHTML=PT_ACTS.map(a=>{
+    const on=!!(ptDoneToday[ptViewChild.id]&&ptDoneToday[ptViewChild.id][a.id]);
+    return`<div class="pt-act ${on?'done':''}" id="pta-${a.id}" ${ptParentMode?'':` onclick="ptToggle('${a.id}')"`}>
+      <div class="pt-act-icon" style="background:${on?a.color+'33':a.bg}">${a.icon}</div>
+      <div style="flex:1"><div class="pt-act-label">${a.name}</div><div class="pt-act-desc">${on?'✓ Completed!':a.desc}</div></div>
+      <div class="pt-check">${on?'✓':''}</div>
+    </div>`;
+  }).join('');
+}
+
+function ptToggle(id){
+  if(!ptDoneToday[ptViewChild.id])ptDoneToday[ptViewChild.id]={};
+  ptDoneToday[ptViewChild.id][id]=!ptDoneToday[ptViewChild.id][id];
+  ptRenderActs();
+  if(PT_ACTS.filter(a=>ptDoneToday[ptViewChild.id][a.id]).length===PT_ACTS.length)toast('🏆 All done! Amazing soldier!');
+}
+
+async function ptSaveAll(){
+  if(!ptViewChild)return;
+  const tk=todayKey();
+  PT_ACTS.forEach(a=>{if(ptDoneToday[ptViewChild.id]&&ptDoneToday[ptViewChild.id][a.id]){if(!ptViewChild.logs[a.id])ptViewChild.logs[a.id]={};ptViewChild.logs[a.id][tk]=true;}});
+  const doneCount=PT_ACTS.filter(a=>ptDoneToday[ptViewChild.id]&&ptDoneToday[ptViewChild.id][a.id]).length;
+  if(doneCount>0)ptViewChild.st=(ptViewChild.st||0)+1;
+  document.getElementById('ptSaveStatus').textContent='Saving to cloud…';
+  await saveToFb(ptViewChild);
+  document.getElementById('ptSaveStatus').textContent='✅ Saved! '+doneCount+' activities logged.';
+  toast('✅ Saved to cloud for '+ptViewChild.name.split(' ')[0]+'!');
+}
+
+function ptLogout(){
+  ptRole=null;ptViewChild=null;ptParentMode=false;
+  document.getElementById('ptLogin').style.display='flex';
+  document.getElementById('ptDash').style.display='none';
+  document.getElementById('ptFormWrap').style.display='none';
+  document.querySelectorAll('.pt-role').forEach(r=>r.classList.remove('selected'));
+  document.getElementById('ptChildSel').value='';
+  [0,1,2,3].forEach(i=>{document.getElementById('pin'+i).value='';});
+  document.getElementById('ptErr').classList.remove('show');
+}
+
+/* ══════════════════════════════════════════
+   WEEKS
+══════════════════════════════════════════ */
+function popWks(){
+  const w=aw();document.getElementById('hdrWeekBtn').textContent=w.label+' ▾';
+  const o=weeks.map(wk=>`<option value="${wk.id}"${wk.id===awId?' selected':''}>${wk.label}</option>`).join('');
+  ['mvWk'].forEach(id=>{const e=document.getElementById(id);if(e)e.innerHTML=o;});
+  renderWkSheet();renderWkMgr();
+}
+function renderWkSheet(){document.getElementById('wkOptions').innerHTML=weeks.map(w=>`<div class="wk-option" onclick="setAw(${w.id})"><div><div class="wk-opt-name">${w.label}</div><div class="wk-opt-date">${w.s||'No date'}${w.e?' → '+w.e:''}</div></div><div class="wk-opt-check">${w.id===awId?'✅':''}</div></div>`).join('');}
+function mvInfo(){const w=weeks.find(x=>x.id===parseInt(document.getElementById('mvWk').value));const e=document.getElementById('mvWI');if(e&&w)e.textContent=w.s&&w.e?'📅 '+w.s+' → '+w.e:'';}
+function setAw(id){awId=id;popWks();ra();closeM('wkSheet');toast('✅ '+aw().label+' is now active');}
+async function addWk(){const ni=Math.max(...weeks.map(w=>w.id))+1;const nw={id:ni,label:'Week '+ni,s:'',e:''};weeks.push(nw);popWks();await saveWeeksToFb();toast('📅 Week '+ni+' added!');}
+function renderWkMgr(){document.getElementById('wkMgr').innerHTML=weeks.map(w=>`<div class="wk-row"><div class="wk-row-top"><div class="wk-num">${w.label}</div><div style="display:flex;gap:6px"><button class="btn btn-gold btn-sm" onclick="setAw(${w.id})">${w.id===awId?'✅ Active':'Set Active'}</button></div></div><div class="fr" style="margin-bottom:6px"><label class="fl" style="font-size:9px">Name</label><input type="text" value="${w.label}" onchange="upWk(${w.id},'label',this.value)" placeholder="Week name"></div><div class="wk-dates"><div style="flex:1"><label class="fl" style="font-size:9px">Start</label><input type="date" value="${w.s||''}" onchange="upWk(${w.id},'s',this.value)" style="width:100%"></div><div style="flex:1"><label class="fl" style="font-size:9px">End</label><input type="date" value="${w.e||''}" onchange="upWk(${w.id},'e',this.value)" style="width:100%"></div></div></div>`).join('');}
+async function upWk(id,f,v){const w=weeks.find(x=>x.id===id);if(w)w[f]=v;popWks();await saveWeeksToFb();}
+
+/* ══════════════════════════════════════════
+   VIEWS
+══════════════════════════════════════════ */
+function sv(id,btn){document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.querySelectorAll('.bn-btn').forEach(b=>b.classList.remove('active'));document.getElementById('view-'+id).classList.add('active');btn.classList.add('active');document.getElementById('scrollArea').scrollTop=0;if(id==='attendance')renderAtt();}
+function setGrp(g,btn){curGrp=g;document.querySelectorAll('.qa-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderChildren();}
+function subTab(id,btn){document.querySelectorAll('.sub-tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');['subCharts','subNotifs','subWeeks','subManage'].forEach(s=>{const e=document.getElementById(s);if(e)e.style.display='none';});document.getElementById('sub'+id.charAt(0).toUpperCase()+id.slice(1)).style.display='block';if(id==='charts')setTimeout(renderCharts,80);if(id==='manage')renderManage();}
+
+/* ══════════════════════════════════════════
+   DASHBOARD
+══════════════════════════════════════════ */
+function renderOv(){
+  const fc=gf();
+  const avg=Math.round(fc.reduce((a,c)=>a+cScore(c),0)/Math.max(fc.length,1));
+  const aa=Math.round(fc.reduce((a,c)=>a+aRate(c),0)/Math.max(fc.length,1));
+  const ts=fc.length?Math.max(...fc.map(c=>c.st||0)):0;
+  document.getElementById('ovGrid').innerHTML=[
+    {i:'⚔️',v:fc.length,l:'Soldiers',c:'#1A2B5A'},
+    {i:'🔥',v:avg+'%',l:'Avg Score',c:'#E67E22'},
+    {i:'📋',v:aa+'%',l:'Attendance',c:'#2980B9'},
+    {i:'🏆',v:ts+'d',l:'Top Streak',c:'#F5A623'},
+  ].map(c=>`<div class="ov-card" style="border-top-color:${c.c}"><span class="ov-icon">${c.i}</span><div class="ov-val" style="color:${c.c}">${c.v}</div><div class="ov-lbl">${c.l}</div></div>`).join('');
+  document.getElementById('pilList').innerHTML=PILS.map(p=>{
+    let d=0,t=0;gf().forEach(c=>DAYS.forEach(dy=>{t++;if(c.logs&&c.logs[p.id]&&c.logs[p.id][dy])d++;}));
+    const r=t?Math.round(d/t*100):0;
+    return`<div class="pil-item"><div class="pil-top"><div class="pil-icon" style="background:${p.color}18;color:${p.color}">${p.icon}</div><div class="pil-name">${p.label}</div><div class="pil-pct" style="color:${p.color}">${r}%</div></div><div class="pb"><div class="pb-fill" style="width:${r}%;background:${p.color}"></div></div><div class="day-row">${DAYS.map((dy,i)=>{const cnt=gf().filter(c=>c.logs&&c.logs[p.id]&&c.logs[p.id][dy]).length;const pct=gf().length?Math.round(cnt/gf().length*100):0;return`<div class="dd ${pct>=50?'on':''}" style="${pct>=50?'background:'+p.color+';':''}"  title="${DS[i]}: ${cnt}">✓</div>`;}).join('')}</div></div>`;
+  }).join('');
+}
+
+/* ══════════════════════════════════════════
+   CHILDREN
+══════════════════════════════════════════ */
+function bldSel(){const o="<option value=''>-- Choose a child --</option>"+ch.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');['logCS','nfCh'].forEach(id=>{const e=document.getElementById(id);if(e)e.innerHTML=o;});}
+function renderChildren(){
+  const q=(document.getElementById('srch')||{value:''}).value.toLowerCase();
+  let fc=gf().filter(c=>c.name.toLowerCase().includes(q));fc.sort((a,b)=>cScore(b)-cScore(a));
+  document.getElementById('childList').innerHTML=fc.map(c=>{
+    const s=cScore(c),at=aRate(c),ac=AC[(c.av||0)%AC.length],gc=GRP[c.g]||GRP.lions;
+    const sk=(c.st||0)>=7?'🔥':(c.st||0)>=5?'⚡':'📌';
+    return`<div class="child-card" onclick="openChildDetail('${c.id}')"><div class="av" style="background:${ac}">${ini(c.name)}</div><div class="child-info"><div class="child-name">${c.name}</div><div class="child-meta"><span class="bdg" style="background:${gc.color}22;color:${gc.color}">${gc.label}</span> · Age ${c.age}</div><div class="mini-dots">${PILS.map(p=>{const ok=DAYS.some(d=>c.logs&&c.logs[p.id]&&c.logs[p.id][d]);return`<div class="md" style="background:${ok?p.color:'#e0e6f0'}">${p.icon}</div>`;}).join('')}</div></div><div class="child-score"><div class="score-val" style="color:${sc(s)}">${s}%</div><div class="score-lbl">Score</div><div class="streak-badge">${sk}${c.st||0}d</div></div></div>`;
+  }).join('');
+  const ranked=[...gf()].sort((a,b)=>cScore(b)-cScore(a));
+  const md=['🥇','🥈','🥉'];
+  document.getElementById('lbCard').innerHTML=ranked.slice(0,5).map((c,i)=>{const s=cScore(c),ac=AC[(c.av||0)%AC.length],st=Math.round(s/20);const rs=i===0?'color:#F5A623':i===1?'color:#9BA8B5':i===2?'color:#B87333':'';return`<div class="lb-row"><div class="lb-rank" style="${rs}">${i<3?md[i]:i+1}</div><div class="av" style="background:${ac};width:32px;height:32px;font-size:11px">${ini(c.name)}</div><div style="flex:1"><div style="font-weight:800;font-size:13px">${c.name}</div><div style="font-size:11px;color:var(--gold)">${'★'.repeat(st)}${'☆'.repeat(5-st)}</div></div><div style="text-align:right"><div style="font-family:'Fredoka One',cursive;font-size:15px;color:${sc(s)}">${s}%</div><div style="font-size:10px;color:var(--muted)">🔥${c.st||0}d</div></div></div>`;}).join('');
+}
+
+function renderManage(){
+  document.getElementById('manageChildList').innerHTML=ch.map(c=>`<div class="child-card"><div class="av" style="background:${AC[(c.av||0)%AC.length]}">${ini(c.name)}</div><div class="child-info"><div class="child-name">${c.name}</div><div class="child-meta">${GRP[c.g]?.label||c.g} · PIN: ${c.pin||'1234'}</div></div><button class="btn btn-outline btn-sm" onclick="editPin('${c.id}')">Edit PIN</button></div>`).join('');
+}
+
+async function editPin(cid){
+  const c=ch.find(x=>String(x.id)===String(cid));if(!c)return;
+  const p=prompt('New 4-digit PIN for '+c.name.split(' ')[0]+':',c.pin||'1234');
+  if(!p||p.length!==4||isNaN(p)){toast('⚠️ PIN must be 4 digits');return;}
+  c.pin=p;await saveToFb(c);toast('✅ PIN updated for '+c.name.split(' ')[0]);renderManage();
+}
+
+function openChildDetail(cid){
+  const c=ch.find(x=>String(x.id)===String(cid));if(!c)return;
+  const s=cScore(c),at=aRate(c),ac=AC[(c.av||0)%AC.length];
+  document.getElementById('cdHead').innerHTML=`<div class="cd-av" style="background:${ac}">${ini(c.name)}</div><div class="cd-name">${c.name}</div><div class="cd-sub">${GRP[c.g]?.label||c.g} · Age ${c.age}</div>`;
+  document.getElementById('cdBody').innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px"><div style="background:var(--bg);border-radius:10px;padding:10px;text-align:center"><div style="font-family:'Fredoka One',cursive;font-size:22px;color:${sc(s)}">${s}%</div><div style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase">Score</div></div><div style="background:var(--bg);border-radius:10px;padding:10px;text-align:center"><div style="font-family:'Fredoka One',cursive;font-size:22px;color:var(--gold)">🔥${c.st||0}</div><div style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase">Streak</div></div><div style="background:var(--bg);border-radius:10px;padding:10px;text-align:center"><div style="font-family:'Fredoka One',cursive;font-size:22px;color:${sc(at)}">${at}%</div><div style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase">Attend.</div></div></div>${PILS.map(p=>{const done=DAYS.filter(d=>c.logs&&c.logs[p.id]&&c.logs[p.id][d]).length;const pct=Math.round(done/7*100);return`<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px"><div style="width:28px;height:28px;border-radius:8px;background:${p.color}18;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">${p.icon}</div><div style="flex:1"><div style="font-weight:700;font-size:12px">${p.label}</div><div class="pb" style="margin:2px 0 0"><div class="pb-fill" style="width:${pct}%;background:${p.color}"></div></div></div><span style="font-size:12px;font-weight:800;color:${p.color}">${pct}%</span></div>`;}).join('')}<div style="margin-top:12px;background:var(--bg);border-radius:10px;padding:10px"><div style="font-size:10px;font-weight:800;color:var(--muted);margin-bottom:4px">PARENT CONTACT</div><div style="font-weight:700;font-size:13px">${c.par}</div><div style="font-size:12px;color:var(--muted)">${c.con}</div></div><div class="btn-row" style="margin-top:12px"><button class="btn btn-gold btn-block" onclick="qLog('${c.id}');closeM('childModal')">📝 Log Activity</button><button class="btn btn-green btn-block" onclick="waDirect('${c.id}');closeM('childModal')">💬 WhatsApp Parent</button><button class="btn btn-outline btn-block" onclick="closeM('childModal')">Close</button></div>`;
+  openM('childModal');
+}
+
+/* ══════════════════════════════════════════
+   LOG ACTIVITY
+══════════════════════════════════════════ */
+function bldLog(){LSECS.forEach(({id,f})=>{const e=document.getElementById(id);if(!e)return;e.innerHTML=f.map(x=>`<div class="lf" id="lf-${x.id}" onclick="togLF('${x.id}')"><div class="lf-icon">${x.i}</div><div class="lf-label">${x.l}</div><div class="lf-check"></div></div>`).join('');});renderStars();}
+function togLF(id){logSt[id]=!logSt[id];const e=document.getElementById('lf-'+id);if(e)e.classList.toggle('on',!!logSt[id]);}
+function renderStars(){const e=document.getElementById('logStars');if(!e)return;e.innerHTML=[1,2,3,4,5].map(n=>`<button class="star ${n<=logStar?'on':''}" onclick="setStar(${n})">★</button>`).join('');}
+function setStar(n){logStar=n;renderStars();}
+function onLogCC(){const id=document.getElementById('logCS').value;const c=ch.find(x=>String(x.id)===String(id));const ci=document.getElementById('logCI');if(!c){ci.innerHTML='';return;}const s=cScore(c),ac=AC[(c.av||0)%AC.length];ci.innerHTML=`<div style="display:flex;align-items:center;gap:9px;background:var(--bg);padding:10px;border-radius:10px"><div class="av" style="background:${ac};width:36px;height:36px;font-size:13px">${ini(c.name)}</div><div style="flex:1"><div style="font-weight:800;font-size:13px">${c.name}</div><div style="font-size:11px;color:var(--muted)">${GRP[c.g]?.label||c.g} · Age ${c.age}</div></div><div style="text-align:right"><div style="font-family:'Fredoka One',cursive;font-size:18px;color:${sc(s)}">${s}%</div><div style="font-size:9px;color:var(--muted);font-weight:700">SCORE</div></div></div>`;}
+
+async function saveLog(){
+  const id=document.getElementById('logCS').value;const c=ch.find(x=>String(x.id)===String(id));
+  if(!c){toast('⚠️ Select a child first');return;}
+  const day=document.getElementById('logDS').value;
+  if(!c.logs)c.logs={};
+  PILS.forEach(p=>{if(!c.logs[p.id])c.logs[p.id]={};});
+  if(logSt.mp||logSt.ep)c.logs.prayer[day]=true;
+  if(logSt.br)c.logs.word[day]=true;
+  if(logSt.wo)c.logs.worship[day]=true;
+  if(logSt.wa||logSt.qt)c.logs.waiting[day]=true;
+  if(logSt.ch||logSt.ki)c.logs.character[day]=true;
+  if(logSt.ac)c.logs.academic[day]=true;
+  if(logSt.le)c.logs.leadership[day]=true;
+  c.st=(c.st||0)+1;
+  await saveToFb(c);
+  ra();toast('✅ Activity logged & saved to cloud for '+c.name.split(' ')[0]+'!');
+}
+
+async function saveWA(){
+  const id=document.getElementById('logCS').value;const c=ch.find(x=>String(x.id)===String(id));
+  if(!c){toast('⚠️ Select a child first');return;}
+  await saveLog();const s=cScore(c);
+  const msg=`Dear ${c.par},\n\n📋 Joel Two Army Activity Update for ${c.name}:\nScore: ${s}% | Streak: ${c.st||0} days 🔥\n\nActivity logged today. God bless!\n— Joel Two Army Ministry`;
+  window.open(`https://wa.me/${c.con.replace(/\D/g,'')}?text=${encodeURIComponent(msg)}`,'_blank');
+  toast('💬 Opening WhatsApp for '+c.par+'…');
+}
+
+function clearLog(){logSt={};logStar=0;document.querySelectorAll('.lf').forEach(e=>e.classList.remove('on'));renderStars();['fPass','fGod','fCex','logN'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});['fUnd','fMP','fRec','fCl','fOb'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});toast('🔄 Log cleared');}
+function qLog(cid){document.getElementById('logCS').value=cid;onLogCC();sv('log',document.querySelector('[data-view=log]'));}
+
+/* ══════════════════════════════════════════
+   MEMORY VERSES
+══════════════════════════════════════════ */
+function renderMV(){
+  const mvEl=document.getElementById('mvList');if(!mvEl)return;
+  mvEl.innerHTML=mvs.length?mvs.map(v=>{const w=weeks.find(x=>x.id===v.wk);const gc=v.grp==='all'?'All Groups':GRP[v.grp]?.label||v.grp;const r=Math.round(Math.random()*60+30);return`<div class="mv-card"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px"><div><div class="mv-ref">${v.ref}</div><div style="font-size:10px;font-weight:800;color:var(--muted)">${w?w.label:'Week '+v.wk} · ${gc}</div></div><button class="btn btn-red btn-sm" onclick="rmV('${v.docId||v.wk}')">🗑️</button></div><div class="mv-txt">"${v.txt}"</div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;font-weight:700;color:var(--muted)">Recitation:</span><div class="pb" style="flex:1;margin:0"><div class="pb-fill" style="width:${r}%;background:var(--teal)"></div></div><span style="font-size:12px;font-weight:800;color:var(--teal)">${r}%</span></div></div>`}).join(''):'<p style="color:var(--muted);font-size:13px">No verses assigned yet.</p>';
+}
+
+async function saveMV(){
+  const ref=document.getElementById('mvRef').value.trim();
+  const txt=document.getElementById('mvTxt').value.trim();
+  const th=document.getElementById('mvThm').value.trim()||'—';
+  const wk=parseInt(document.getElementById('mvWk').value);
+  const grp=document.getElementById('mvGrp').value;
+  if(!ref||!txt){toast('⚠️ Enter reference and verse text');return;}
+  const vDoc={wk,ref,txt,th,grp};
+  if(fbReady&&window._fb.CONFIGURED&&currentUser){
+    const{db,doc,setDoc}=window._fb;
+    await setDoc(doc(db,'verses','week_'+wk),vDoc);
+  }else{
+    mvs=mvs.filter(v=>v.wk!==wk);mvs.push({...vDoc,docId:'week_'+wk});mvs.sort((a,b)=>a.wk-b.wk);renderMV();
+  }
+  ['mvRef','mvTxt','mvThm'].forEach(id=>{document.getElementById(id).value='';});
+  toast('📖 Verse saved to cloud!');
+}
+
+async function rmV(docId){
+  if(fbReady&&window._fb.CONFIGURED&&currentUser){
+    try{await window._fb.db;}catch(e){}
+    const{db,doc,deleteDoc}=window._fb;
+    if(window._fb.deleteDoc)await window._fb.deleteDoc(doc(db,'verses',String(docId)));
+  }
+  mvs=mvs.filter(v=>(v.docId||'week_'+v.wk)!==String(docId));renderMV();toast('🗑️ Verse removed');
+}
+
+/* ══════════════════════════════════════════
+   ATTENDANCE
+══════════════════════════════════════════ */
+function renderAtt(){
+  const fc=gf();
+  const tot=fc.reduce((a,c)=>a+Object.values(c.att||{}).filter(v=>v==='present').length,0);
+  const rate=fc.length?Math.round(tot/(fc.length*7)*100):0;
+  document.getElementById('attSum').innerHTML=[{i:'✅',v:tot,l:'Present Entries',c:'#27AE60'},{i:'📊',v:rate+'%',l:'Avg Attendance',c:'#2980B9'}].map(c=>`<div class="ov-card" style="border-top-color:${c.c}"><span class="ov-icon">${c.i}</span><div class="ov-val" style="color:${c.c}">${c.v}</div><div class="ov-lbl">${c.l}</div></div>`).join('');
+  document.getElementById('attList').innerHTML=fc.map(c=>{const at=aRate(c),ac=AC[(c.av||0)%AC.length];return`<div class="card" style="margin-bottom:10px"><div style="padding:10px 12px;background:var(--bg);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between"><div style="display:flex;gap:8px;align-items:center"><div class="av" style="background:${ac};width:30px;height:30px;font-size:11px">${ini(c.name)}</div><div><div style="font-weight:800;font-size:13px">${c.name}</div><div style="font-size:11px;color:var(--muted)">${GRP[c.g]?.label||c.g}</div></div></div><div style="font-family:'Fredoka One',cursive;font-size:16px;color:${sc(at)}">${at}%</div></div><div style="padding:10px 12px;display:flex;gap:6px;justify-content:space-between">${DAYS.map((d,i)=>{const st=c.att&&c.att[d]||'';const ic={present:'✓',absent:'✗',excused:'E','':''};return`<div style="text-align:center"><div style="font-size:9px;font-weight:800;color:var(--muted);margin-bottom:4px">${DS[i]}</div><div class="att-dot ${st}" onclick="cycAtt('${c.id}','${d}')">${ic[st]||''}</div></div>`;}).join('')}</div></div>`;}).join('');}
+
+async function cycAtt(cid,day){const c=ch.find(x=>String(x.id)===String(cid));if(!c)return;if(!c.att)c.att={};const cy=['present','absent','excused',''];const cur=c.att[day]||'';c.att[day]=cy[(cy.indexOf(cur)+1)%cy.length];await saveToFb(c);renderAtt();renderChildren();toast(c.name.split(' ')[0]+' → '+(c.att[day]||'cleared'));}
+async function markAll(){gf().forEach(c=>{if(!c.att)c.att={};DAYS.forEach(d=>{c.att[d]='present';});});await Promise.all(gf().map(c=>saveToFb(c)));renderAtt();renderChildren();toast('✅ All marked Present & saved!');}
+function exportAtt(){let csv='Name,Group,'+DAYS.join(',')+',Present,Absent,Rate\n';ch.forEach(c=>{const p=Object.values(c.att||{}).filter(v=>v==='present').length;const ab=Object.values(c.att||{}).filter(v=>v==='absent').length;csv+=`${c.name},${GRP[c.g]?.label||c.g},${DAYS.map(d=>(c.att&&c.att[d])||'').join(',')},${p},${ab},${aRate(c)}%\n`;});const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);a.download='JoelTwoArmy_Attendance.csv';a.click();toast('📤 Exported!');}
+
+/* ══════════════════════════════════════════
+   NOTIFICATIONS
+══════════════════════════════════════════ */
+const NTP={
+  progress:(c,s,at)=>`Dear ${c.par},\n\n🙏 Greetings from Joel Two Army!\n\nThis week ${c.name.split(' ')[0]} scored ${s}% with ${at}% attendance.\n\nPlease encourage them at home!\n\nGod bless! 👋\n— Joel Two Army Ministry`,
+  verse:c=>{const v=mvs[mvs.length-1]||{ref:'—',txt:'—'};return`Dear ${c.par},\n\n📖 Memory verse for ${c.name.split(' ')[0]}:\n\n"${v.txt}"\n— ${v.ref}\n\nHelp them practise daily!\n\n— Joel Two Army Ministry`;},
+  praise:(c,s)=>`Dear ${c.par}, 🎉 GREAT NEWS!\n\n${c.name.split(' ')[0]} scored ${s}% this week! Excellent character and faithfulness. We are so proud!\n— Joel Two Army Ministry`,
+  encourage:(c,s)=>`Dear ${c.par}, 💙\n\n${c.name.split(' ')[0]} needs more encouragement (score: ${s}%). Please pray together daily.\n\nGod bless!\n— Joel Two Army Ministry`,
+  attendance:c=>{const at=aRate(c);return`Dear ${c.par}, 📋\n\nAttendance for ${c.name.split(' ')[0]}: ${at}%. ${at<60?'We miss them!':'Attending faithfully!'}\n\n— Joel Two Army Ministry`;},
+  custom:c=>`Dear ${c.par},\n\n[Write your message for ${c.name.split(' ')[0]} here]\n\n— Joel Two Army Ministry`,
+};
+function nfPrev(){const id=document.getElementById('nfCh').value;const ty=document.getElementById('nfTy').value;const c=ch.find(x=>String(x.id)===String(id));if(!c){document.getElementById('nfMsg').value='';return;}document.getElementById('nfMsg').value=(NTP[ty]||NTP.custom)(c,cScore(c),aRate(c));}
+function doWA(){const id=document.getElementById('nfCh').value;const c=ch.find(x=>String(x.id)===String(id));if(!c){toast('⚠️ Select a child');return;}const msg=document.getElementById('nfMsg').value;const ph=c.con.replace(/\D/g,'');if(!ph){toast('⚠️ No phone saved');return;}window.open(`https://wa.me/${ph}?text=${encodeURIComponent(msg)}`,'_blank');addSentN(c,'WhatsApp','💬');toast('💬 Opening WhatsApp for '+c.par+'…');}
+function doSMS(){const msg=document.getElementById('nfMsg').value;if(!msg){toast('⚠️ No message');return;}navigator.clipboard.writeText(msg).then(()=>toast('📋 Copied!')).catch(()=>toast('⚠️ Copy failed'));}
+function bulkNotif(){gf().forEach(c=>sentN.unshift({ch:c.name,ty:'Bulk Progress',ti:'Just now',ic:'⭐',par:c.par}));renderNfLog();toast('📲 Notified '+gf().length+' parents!');}
+function addSentN(c,ty,ic){sentN.unshift({ch:c.name,ty,ti:'Just now',ic,par:c.par});renderNfLog();}
+function renderNfLog(){const e=document.getElementById('nfLog');if(!e)return;e.innerHTML=sentN.slice(0,8).map(n=>`<div class="nf-row"><div class="nf-ico">${n.ic}</div><div style="flex:1"><div style="font-weight:800;font-size:13px">${n.ch}</div><div style="font-size:12px;color:var(--muted)">${n.ty} → ${n.par}</div><div style="font-size:10px;color:var(--muted);margin-top:1px">${n.ti}</div></div></div>`).join('')||'<p style="color:var(--muted);font-size:13px">No notifications sent yet.</p>';}
+function qNf(cid){document.getElementById('nfCh').value=cid;nfPrev();sv('more',document.querySelector('[data-view=more]'));document.querySelectorAll('.sub-tab')[1].click();}
+function waDirect(cid){const c=ch.find(x=>String(x.id)===String(cid));if(!c)return;const s=cScore(c),at=aRate(c);const msg=NTP.progress(c,s,at);window.open(`https://wa.me/${c.con.replace(/\D/g,'')}?text=${encodeURIComponent(msg)}`,'_blank');toast('💬 WhatsApp for '+c.par+'…');}
+
+/* ══════════════════════════════════════════
+   ADD CHILD
+══════════════════════════════════════════ */
+async function addChild(){
+  const name=document.getElementById('nName').value.trim();
+  const age=parseInt(document.getElementById('nAge').value)||10;
+  const grp=document.getElementById('nGrp').value;
+  const par=document.getElementById('nPar').value.trim()||'Parent';
+  const con=document.getElementById('nCon').value.trim()||'';
+  const pin=document.getElementById('nPin').value.trim()||'1234';
+  if(!name){toast('⚠️ Enter the child\'s name');return;}
+  const newId=fbReady&&window._fb.CONFIGURED?'child_'+Date.now():String(++idC);
+  const nc={id:newId,name,age,g:grp,par,con,st:0,av:ch.length%AC.length,pin,logs:{},att:{}};
+  PILS.forEach(p=>{nc.logs[p.id]={};DAYS.forEach(d=>{nc.logs[p.id][d]=false;});});DAYS.forEach(d=>{nc.att[d]='';});
+  if(fbReady&&window._fb.CONFIGURED&&currentUser){await saveToFb(nc);}
+  else{ch.push(nc);}
+  closeM('addModal');['nName','nAge','nPar','nCon','nPin'].forEach(id=>{document.getElementById(id).value='';});
+  bldSel();ptPopSel();ra();toast('🎉 '+name.split(' ')[0]+' joined the Army & saved to cloud!');
+}
+
+/* ══════════════════════════════════════════
+   CHARTS
+══════════════════════════════════════════ */
+let chartsInited=false;
+function initCharts(){if(!chartsInited){chartsInited=true;setTimeout(renderCharts,150);}}
+function renderCharts(){
+  Object.values(charts).forEach(c=>{try{c.destroy();}catch(e){}});charts={};
+  const wl=weeks.map(w=>w.label);
+  const t=document.getElementById('chT');if(t)charts.t=new Chart(t,{type:'line',data:{labels:wl,datasets:[{label:'Lions',data:weeks.map(()=>Math.round(60+Math.random()*20)),borderColor:'#E67E22',backgroundColor:'rgba(230,126,34,.1)',tension:.4,fill:true,borderWidth:2,pointRadius:3},{label:'Eagles',data:weeks.map(()=>Math.round(65+Math.random()*20)),borderColor:'#2980B9',backgroundColor:'rgba(41,128,185,.1)',tension:.4,fill:true,borderWidth:2,pointRadius:3},{label:'Warriors',data:weeks.map(()=>Math.round(60+Math.random()*25)),borderColor:'#8E44AD',backgroundColor:'rgba(142,68,173,.1)',tension:.4,fill:true,borderWidth:2,pointRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{boxWidth:10,font:{size:11}}}},scales:{y:{min:40,max:100,ticks:{callback:v=>v+'%',font:{size:10}}}}}});
+  const p=document.getElementById('chP');if(p)charts.p=new Chart(p,{type:'bar',data:{labels:PILS.map(x=>x.icon+' '+x.label.split(' ')[0]),datasets:[{label:'%',data:PILS.map(p=>{let d=0,t=0;gf().forEach(c=>DAYS.forEach(dy=>{t++;if(c.logs&&c.logs[p.id]&&c.logs[p.id][dy])d++;}));return t?Math.round(d/t*100):0;}),backgroundColor:PILS.map(x=>x.color+'bb'),borderColor:PILS.map(x=>x.color),borderWidth:1,borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{max:100,ticks:{callback:v=>v+'%',font:{size:10}}}}}});
+  const s=[...ch].sort((a,b)=>cScore(b)-cScore(a)).slice(0,8);
+  const i=document.getElementById('chI');if(i)charts.i=new Chart(i,{type:'bar',data:{labels:s.map(c=>c.name.split(' ')[0]),datasets:[{label:'Score %',data:s.map(c=>cScore(c)),backgroundColor:s.map(c=>AC[(c.av||0)%AC.length]+'bb'),borderColor:s.map(c=>AC[(c.av||0)%AC.length]),borderWidth:1,borderRadius:4}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{max:100,ticks:{callback:v=>v+'%',font:{size:10}}}}}});
+}
+
+/* ══════════════════════════════════════════
+   MODALS & TOAST
+══════════════════════════════════════════ */
+function openM(id){document.getElementById(id).classList.add('open');document.body.style.overflow='hidden';}
+function closeM(id){document.getElementById(id).classList.remove('open');document.body.style.overflow='';}
+document.querySelectorAll('.overlay').forEach(e=>{e.addEventListener('click',function(ev){if(ev.target===this)closeM(this.id);});});
+let tT;
+function toast(msg){const e=document.getElementById('toastEl');e.textContent=msg;e.classList.add('show');clearTimeout(tT);tT=setTimeout(()=>e.classList.remove('show'),2800);}
+
+/* ══════════════════════════════════════════
+   RENDER ALL
+══════════════════════════════════════════ */
+function ra(){renderOv();renderChildren();renderMV();renderNfLog();}
+
+/* ══════════════════════════════════════════
+   INIT
+══════════════════════════════════════════ */
+bldLog();
+// Firebase initialises via module → fires fbReady event
+// Fallback if Firebase not configured after 2s
+setTimeout(()=>{
+  if(!fbReady){setSyncStatus('err','No Firebase');loadDemoData();}
+},2000);
+</script>
+</body>
+</html>
